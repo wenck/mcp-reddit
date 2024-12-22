@@ -29,7 +29,7 @@ async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
                 f"Comments: {submission.num_comments}\n"
                 f"Author: {submission.author_display_name or '[deleted]'}\n"
                 f"Type: {_get_post_type(submission)}\n"
-                f"Content: {_get_content(submission)}\n""
+                f"Content: {_get_content(submission)}\n"
                 f"Link: https://reddit.com{submission.permalink}\n"
                 f"---"
             )
