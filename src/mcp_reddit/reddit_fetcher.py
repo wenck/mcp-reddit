@@ -41,17 +41,33 @@ async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
         logging.error(f"An error occurred: {str(e)}")
         return f"An error occurred: {str(e)}"
 
+def _format_comment_tree(comment_node, depth: int = 0) -> str:
+    """Helper method to recursively format comment tree with proper indentation"""
+    comment = comment_node.value
+    indent = "-- " * depth
+    content = (
+        f"{indent}* Author: {comment.author_display_name or '[deleted]'}\n"
+        f"{indent}  Score: {comment.score}\n"
+        f"{indent}  {comment.body}\n"
+    )
+
+    for child in comment_node.children:
+        content += "\n" + _format_comment_tree(child, depth + 1)
+
+    return content
+
 @mcp.tool()
-async def fetch_reddit_post_content(post_id: str, include_comments: bool = True) -> str:
+async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comment_depth: int = 3) -> str:
     """
     Fetch detailed content of a specific post
     
     Args:
         post_id: Reddit post ID
-        include_comments: Whether to include top comments (default: True)
-        
+        comment_limit: Number of top level comments to fetch
+        comment_depth: Maximum depth of comment tree to traverse
+
     Returns:
-        Human readable string containing post content and optional comments
+        Human readable string containing post content and comments tree
     """
     try:
         submission = await client.p.submission.fetch(post_id)
@@ -63,20 +79,15 @@ async def fetch_reddit_post_content(post_id: str, include_comments: bool = True)
             f"Type: {_get_post_type(submission)}\n"
             f"Content: {_get_content(submission)}\n"
         )
-        
-        if include_comments:
-            comments = await client.p.comment_tree.fetch(post_id, sort='top', limit=5)
-            if comments.children:
-                content += "\nTop Comments:\n"
-                for i, comment in enumerate(comments.children[:5], 1):
-                    content += (
-                        f"\n{i}. Author: {comment.value.author_display_name or '[deleted]'}\n"
-                        f"   Score: {comment.value.score}\n"
-                        f"   {comment.value.body}\n"
-                    )
-            else:
-                content += "\nNo comments found."
-                
+
+        comments = await client.p.comment_tree.fetch(post_id, sort='top', limit=comment_limit, depth=comment_depth)
+        if comments.children:
+            content += "\nComments:\n"
+            for comment in comments.children:
+                content += "\n" + _format_comment_tree(comment)
+        else:
+            content += "\nNo comments found."
+
         return content
 
     except Exception as e:
