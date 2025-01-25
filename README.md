@@ -1,4 +1,5 @@
 # MCP Reddit Server
+[![smithery badge](https://smithery.ai/badge/@adhikasp/mcp-reddit)](https://smithery.ai/server/@adhikasp/mcp-reddit)
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) server that provides tools for fetching and analyzing Reddit content.
 
@@ -12,6 +13,15 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) s
 
 ## Installation
 
+### Installing via Smithery
+
+To install Reddit Content for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@adhikasp/mcp-reddit):
+
+```bash
+npx -y @smithery/cli install @adhikasp/mcp-reddit --client claude
+```
+
+### Manual Installation
 ```json
 {
   "reddit": {
