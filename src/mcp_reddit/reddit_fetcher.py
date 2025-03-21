@@ -10,7 +10,7 @@ mcp = FastMCP("Reddit MCP")
 proxy_url = "http://127.0.0.1:2080"  # 本地代理地址
 
 # 初始化 redditwarp 客户端，配置代理
-client = Client(http_client_kwargs={"proxies": {"http": proxy_url, "https": proxy_url}})
+client = Client(proxy_url=proxy_url)
 
 logging.getLogger().setLevel(logging.WARNING)
 
