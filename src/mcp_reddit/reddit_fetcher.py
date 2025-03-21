@@ -5,25 +5,37 @@ from fastmcp import FastMCP
 import logging
 
 mcp = FastMCP("Reddit MCP")
-# 初始化 redditwarp Client 时加入 proxy_url 参数
-client = Client(proxy_url="https://mycors.184198.xyz")
+client = Client()
 logging.getLogger().setLevel(logging.WARNING)
+
+# 添加CORS代理前缀
+CORS_PROXY = "https://mycors.184198.xyz/"
+REDDIT_BASE_URL = "https://reddit.com"
+
+# 帮助函数：将Reddit链接转换为使用CORS代理的链接
+def add_cors_proxy(url):
+    if url.startswith("http"):
+        return f"{CORS_PROXY}{url}"
+    return url
 
 @mcp.tool()
 async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
     """
     Fetch hot threads from a subreddit
-
+    
     Args:
         subreddit: Name of the subreddit
         limit: Number of posts to fetch (default: 10)
-
+        
     Returns:
         Human readable string containing list of post information
     """
     try:
         posts = []
         async for submission in client.p.subreddit.pull.hot(subreddit, limit):
+            # 使用CORS代理创建Reddit链接
+            reddit_link = f"{CORS_PROXY}{REDDIT_BASE_URL}{submission.permalink}"
+            
             post_info = (
                 f"Title: {submission.title}\n"
                 f"Score: {submission.score}\n"
@@ -31,11 +43,11 @@ async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
                 f"Author: {submission.author_display_name or '[deleted]'}\n"
                 f"Type: {_get_post_type(submission)}\n"
                 f"Content: {_get_content(submission)}\n"
-                f"Link: https://reddit.com{submission.permalink}\n"
+                f"Link: {reddit_link}\n"
                 f"---"
             )
             posts.append(post_info)
-
+            
         return "\n\n".join(posts)
 
     except Exception as e:
@@ -61,7 +73,7 @@ def _format_comment_tree(comment_node, depth: int = 0) -> str:
 async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comment_depth: int = 3) -> str:
     """
     Fetch detailed content of a specific post
-
+    
     Args:
         post_id: Reddit post ID
         comment_limit: Number of top level comments to fetch
@@ -72,13 +84,13 @@ async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comme
     """
     try:
         submission = await client.p.submission.fetch(post_id)
-
+        
         content = (
             f"Title: {submission.title}\n"
             f"Score: {submission.score}\n"
             f"Author: {submission.author_display_name or '[deleted]'}\n"
             f"Type: {_get_post_type(submission)}\n"
-            f"Content: {_get_content(submission)}\n"
+            f"Content: {_get_content(submission, use_cors=True)}\n"
         )
 
         comments = await client.p.comment_tree.fetch(post_id, sort='top', limit=comment_limit, depth=comment_depth)
@@ -104,12 +116,18 @@ def _get_post_type(submission) -> str:
         return 'gallery'
     return 'unknown'
 
-def _get_content(submission) -> Optional[str]:
+def _get_content(submission, use_cors: bool = False) -> Optional[str]:
     """Helper method to extract post content based on type"""
     if isinstance(submission, LinkPost):
-        return submission.permalink
+        content = submission.permalink
+        if use_cors and content.startswith("http"):
+            return add_cors_proxy(content)
+        return content
     elif isinstance(submission, TextPost):
         return submission.body
     elif isinstance(submission, GalleryPost):
-        return str(submission.gallery_link)
+        gallery_link = str(submission.gallery_link)
+        if use_cors and gallery_link.startswith("http"):
+            return add_cors_proxy(gallery_link)
+        return gallery_link
     return None
