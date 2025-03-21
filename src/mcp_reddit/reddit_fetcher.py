@@ -3,21 +3,14 @@ from redditwarp.ASYNC import Client
 from redditwarp.models.submission_ASYNC import LinkPost, TextPost, GalleryPost
 from fastmcp import FastMCP
 import logging
-import aiohttp
-
-# 设置本地HTTP代理
-PROXY_URL = "http://127.0.0.1:2080"
 
 mcp = FastMCP("Reddit MCP")
 
-# 创建一个带有代理的aiohttp会话
-async def get_client():
-    connector = aiohttp.TCPConnector(ssl=False)
-    session = aiohttp.ClientSession(connector=connector)
-    # 设置代理
-    session._default_headers['Accept'] = '*/*'
-    client = Client(session=session, proxies=PROXY_URL)
-    return client
+# 配置代理
+proxy_url = "http://127.0.0.1:2080"  # 本地代理地址
+
+# 初始化 redditwarp 客户端，配置代理
+client = Client(http_client_kwargs={"proxies": {"http": proxy_url, "https": proxy_url}})
 
 logging.getLogger().setLevel(logging.WARNING)
 
@@ -34,7 +27,6 @@ async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
         Human readable string containing list of post information
     """
     try:
-        client = await get_client()
         posts = []
         async for submission in client.p.subreddit.pull.hot(subreddit, limit):
             post_info = (
@@ -48,8 +40,7 @@ async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
                 f"---"
             )
             posts.append(post_info)
-        
-        await client.close()
+            
         return "\n\n".join(posts)
 
     except Exception as e:
@@ -85,8 +76,6 @@ async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comme
         Human readable string containing post content and comments tree
     """
     try:
-        client = await get_client()
-        
         submission = await client.p.submission.fetch(post_id)
         
         content = (
@@ -105,7 +94,6 @@ async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comme
         else:
             content += "\nNo comments found."
 
-        await client.close()
         return content
 
     except Exception as e:
