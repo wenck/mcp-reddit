@@ -5,18 +5,19 @@ from fastmcp import FastMCP
 import logging
 
 mcp = FastMCP("Reddit MCP")
-client = Client()
+# 初始化 redditwarp Client 时加入 proxy_url 参数
+client = Client(proxy_url="https://mycors.184198.xyz")
 logging.getLogger().setLevel(logging.WARNING)
 
 @mcp.tool()
 async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
     """
     Fetch hot threads from a subreddit
-    
+
     Args:
         subreddit: Name of the subreddit
         limit: Number of posts to fetch (default: 10)
-        
+
     Returns:
         Human readable string containing list of post information
     """
@@ -34,7 +35,7 @@ async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
                 f"---"
             )
             posts.append(post_info)
-            
+
         return "\n\n".join(posts)
 
     except Exception as e:
@@ -60,7 +61,7 @@ def _format_comment_tree(comment_node, depth: int = 0) -> str:
 async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comment_depth: int = 3) -> str:
     """
     Fetch detailed content of a specific post
-    
+
     Args:
         post_id: Reddit post ID
         comment_limit: Number of top level comments to fetch
@@ -71,7 +72,7 @@ async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comme
     """
     try:
         submission = await client.p.submission.fetch(post_id)
-        
+
         content = (
             f"Title: {submission.title}\n"
             f"Score: {submission.score}\n"
