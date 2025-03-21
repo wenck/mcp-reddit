@@ -3,20 +3,23 @@ from redditwarp.ASYNC import Client
 from redditwarp.models.submission_ASYNC import LinkPost, TextPost, GalleryPost
 from fastmcp import FastMCP
 import logging
+import aiohttp
+
+# 设置本地HTTP代理
+PROXY_URL = "http://127.0.0.1:2080"
 
 mcp = FastMCP("Reddit MCP")
-client = Client()
+
+# 创建一个带有代理的aiohttp会话
+async def get_client():
+    connector = aiohttp.TCPConnector(ssl=False)
+    session = aiohttp.ClientSession(connector=connector)
+    # 设置代理
+    session._default_headers['Accept'] = '*/*'
+    client = Client(session=session, proxies=PROXY_URL)
+    return client
+
 logging.getLogger().setLevel(logging.WARNING)
-
-# 添加CORS代理前缀
-CORS_PROXY = "https://mycors.184198.xyz/"
-REDDIT_BASE_URL = "https://reddit.com"
-
-# 帮助函数：将Reddit链接转换为使用CORS代理的链接
-def add_cors_proxy(url):
-    if url.startswith("http"):
-        return f"{CORS_PROXY}{url}"
-    return url
 
 @mcp.tool()
 async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
@@ -31,11 +34,9 @@ async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
         Human readable string containing list of post information
     """
     try:
+        client = await get_client()
         posts = []
         async for submission in client.p.subreddit.pull.hot(subreddit, limit):
-            # 使用CORS代理创建Reddit链接
-            reddit_link = f"{CORS_PROXY}{REDDIT_BASE_URL}{submission.permalink}"
-            
             post_info = (
                 f"Title: {submission.title}\n"
                 f"Score: {submission.score}\n"
@@ -43,11 +44,12 @@ async def fetch_reddit_hot_threads(subreddit: str, limit: int = 10) -> str:
                 f"Author: {submission.author_display_name or '[deleted]'}\n"
                 f"Type: {_get_post_type(submission)}\n"
                 f"Content: {_get_content(submission)}\n"
-                f"Link: {reddit_link}\n"
+                f"Link: https://reddit.com{submission.permalink}\n"
                 f"---"
             )
             posts.append(post_info)
-            
+        
+        await client.close()
         return "\n\n".join(posts)
 
     except Exception as e:
@@ -83,6 +85,8 @@ async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comme
         Human readable string containing post content and comments tree
     """
     try:
+        client = await get_client()
+        
         submission = await client.p.submission.fetch(post_id)
         
         content = (
@@ -90,7 +94,7 @@ async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comme
             f"Score: {submission.score}\n"
             f"Author: {submission.author_display_name or '[deleted]'}\n"
             f"Type: {_get_post_type(submission)}\n"
-            f"Content: {_get_content(submission, use_cors=True)}\n"
+            f"Content: {_get_content(submission)}\n"
         )
 
         comments = await client.p.comment_tree.fetch(post_id, sort='top', limit=comment_limit, depth=comment_depth)
@@ -101,6 +105,7 @@ async def fetch_reddit_post_content(post_id: str, comment_limit: int = 20, comme
         else:
             content += "\nNo comments found."
 
+        await client.close()
         return content
 
     except Exception as e:
@@ -116,18 +121,12 @@ def _get_post_type(submission) -> str:
         return 'gallery'
     return 'unknown'
 
-def _get_content(submission, use_cors: bool = False) -> Optional[str]:
+def _get_content(submission) -> Optional[str]:
     """Helper method to extract post content based on type"""
     if isinstance(submission, LinkPost):
-        content = submission.permalink
-        if use_cors and content.startswith("http"):
-            return add_cors_proxy(content)
-        return content
+        return submission.permalink
     elif isinstance(submission, TextPost):
         return submission.body
     elif isinstance(submission, GalleryPost):
-        gallery_link = str(submission.gallery_link)
-        if use_cors and gallery_link.startswith("http"):
-            return add_cors_proxy(gallery_link)
-        return gallery_link
+        return str(submission.gallery_link)
     return None
